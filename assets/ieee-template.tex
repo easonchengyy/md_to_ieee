@@ -1,0 +1,270 @@
+% ===================================================================
+%  pandoc 模板：Markdown -> IEEEtran 会议论文 (.tex)
+%  由 scripts/md2ieee.py 通过 --template 传入 pandoc。
+%
+%  关键点：不重定义 \title / \author / \maketitle。
+%  IEEEtran 原生提供这三个命令，pandoc 生成的 \maketitle 会被直接接管，
+%  自动得到「顶部通栏标题 + 居中作者块 + 双栏正文」的 IEEE 版式。
+% ===================================================================
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{iftex}
+
+% -------------------------------------------------------------------
+%  字体。IEEE 要求 Times 外观，但两条引擎分支的可用宏包不同：
+%    pdfLaTeX -> mathptmx（psnfss 自带，最接近 Times）
+%    XeTeX / LuaLaTeX / Tectonic -> fontspec + TeX Gyre Termes
+%  TeX Gyre Termes 是 Times 的等价开源字体，随 TeX Live/Tectonic 分发，
+%  因此在无系统 TeX Live 的机器上也能拿到正确的 Times 外观。
+%  注意：mathptmx 只在 pdfLaTeX 下生效，XeTeX 分支必须显式设数学字体，
+%  否则会退回 Latin Modern，字体度量随之改变导致重排。
+% -------------------------------------------------------------------
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp}
+  \usepackage{mathptmx}
+  \usepackage[scaled=0.9]{helvet}
+\else
+  \usepackage{fontspec}
+  \IfFontExistsTF{texgyretermes-regular.otf}{%
+    \setmainfont{texgyretermes-regular.otf}[%
+      BoldFont       = texgyretermes-bold.otf,%
+      ItalicFont     = texgyretermes-italic.otf,%
+      BoldItalicFont = texgyretermes-bolditalic.otf,%
+      Ligatures      = TeX]%
+  }{%
+    \defaultfontfeatures{Scale=MatchLowercase}%
+    \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}%
+  }%
+  \IfFontExistsTF{texgyreheros-regular.otf}{%
+    \setsansfont{texgyreheros-regular.otf}[Ligatures=TeX]}{}%
+  \usepackage{unicode-math}
+  \IfFontExistsTF{texgyretermes-math.otf}{%
+    \setmathfont{texgyretermes-math.otf}}{}%
+\fi
+
+% -------------------------------------------------------------------
+%  中文支持：仅当文档含中日韩字符时启用（pandoc 检测后设置 cjk 变量）。
+%  pdfLaTeX 无法排版 CJK，必须切到 XeLaTeX/LuaLaTeX 并加载 xeCJK。
+%
+%  中文字体按优先级探测实际可用的候选，避免硬编码某个字体名
+%  在别的机器上不存在而直接编译失败。全部缺失时给出明确提示。
+%  正文衬线中文字体优先（与Times 正文风格协调），
+%  其后回退到系统常见的黑体类无衬线字体。
+% -------------------------------------------------------------------
+$if(cjk)$
+\ifPDFTeX
+  \PackageError{ieee-template}%
+    {This document contains CJK characters. Use XeLaTeX or LuaLaTeX instead}%
+    {Re-run with: --pdf-engine=xelatex}%
+\fi
+\usepackage{xeCJK}
+
+% 中文字体探测：按优先级逐个尝试，找到即用。
+% 顺序为衬线（与 Times 正文风格协调）优先，再回退无衬线。
+% 这样写比定义宏再比较字符串更可靠，也避免 \newif 嵌套的作用域问题。
+% 全部缺失时报错并给出安装建议，而不是让构建莫名其妙失败。
+\def\ieeeCJKmain{NOCJKFONT}
+\IfFontExistsTF{Noto Serif CJK SC}{\def\ieeeCJKmain{Noto Serif CJK SC}}{}
+\IfFontExistsTF{Source Han Serif SC}{\def\ieeeCJKmain{Source Han Serif SC}}{}
+\IfFontExistsTF{Songti SC}{\def\ieeeCJKmain{Songti SC}}{}
+\IfFontExistsTF{STSong}{\def\ieeeCJKmain{STSong}}{}
+\IfFontExistsTF{Noto Sans CJK SC}{\def\ieeeCJKmain{Noto Sans CJK SC}}{}
+\IfFontExistsTF{Source Han Sans SC}{\def\ieeeCJKmain{Source Han Sans SC}}{}
+\IfFontExistsTF{PingFang SC}{\def\ieeeCJKmain{PingFang SC}}{}
+\IfFontExistsTF{Hiragino Sans GB}{\def\ieeeCJKmain{Hiragino Sans GB}}{}
+\IfFontExistsTF{Heiti SC}{\def\ieeeCJKmain{Heiti SC}}{}
+\IfFileExists{/System/Library/Fonts/Supplemental/Songti.ttc}{\def\ieeeCJKmain{Songti SC}}{}
+
+\ifx\ieeeCJKmain NOCJKFONT
+  \ClassError{ieee-template}%
+    {No CJK font found for a Chinese-language document.}%
+    {Install a CJK font, e.g. Noto Serif CJK SC or Source Han Serif, then re-run.}%
+\fi
+\setCJKmainfont{\ieeeCJKmain}
+
+% 无衬线中文字体（图表标签等）
+\IfFontExistsTF{Noto Sans CJK SC}{\setCJKsansfont{Noto Sans CJK SC}}{}%
+\IfFontExistsTF{Hiragino Sans GB}{\setCJKsansfont{Hiragino Sans GB}}{}%
+\IfFontExistsTF{PingFang SC}{\setCJKsansfont{PingFang SC}}{}%
+% 等宽中文字体
+\IfFontExistsTF{Noto Sans Mono CJK SC}{\setCJKmonofont{Noto Sans Mono CJK SC}}{}%
+$endif$
+
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{%
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath}
+}{}
+
+% -------------------------------------------------------------------
+%  IEEE 版式：首行缩进、段间不留空白。
+%  不要加载 parskip —— 它给每段加约 3pt 空白，几十段累积能多出一页，
+%  且不符合 IEEE Transactions 的排版习惯。
+% -------------------------------------------------------------------
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt plus 0.5pt}
+
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{calc}
+\usepackage{etoolbox}
+\usepackage{ragged2e}
+
+% -------------------------------------------------------------------
+%  IEEE 双栏不支持 longtable（它只能单栏用），而 pandoc 默认把
+%  Markdown 表格输出成 longtable。流程是 pandoc 生成 .tex ->
+%  scripts/fix_tables.py 后处理，改写成 IEEE 惯用的 table + 三线表。
+%  这里把续页标记定义成空操作，防止残留标记报错。
+%
+%  切勿重定义 \noalign —— booktabs 的 \toprule/\midrule/\bottomrule
+%  内部依赖它，覆盖后会触发 "Missing \cr inserted" 报错链。
+% -------------------------------------------------------------------
+\def\endfirsthead{}%
+\def\endhead{}%
+\def\endlastfoot{}%
+
+\setlength{\emergencystretch}{3em}
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\ifLuaTeX
+  \usepackage{selnolig}
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{}
+\urlstyle{same}
+\hypersetup{hidelinks, pdfcreator={LaTeX via pandoc}}
+
+% -------------------------------------------------------------------
+%  pandoc 3.x 会把「显式定宽」的图片包进 \pandocbounded{}，
+%  它是 pandoc 默认模板里的命令，自定义模板中未定义会报
+%  "Undefined control sequence"。这里补一个等价实现：
+%  宽度超过栏宽就等比缩到栏宽，否则原样输出。
+% -------------------------------------------------------------------
+\providecommand{\pandocbounded}[1]{%
+  \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{#1}%
+}
+
+% -------------------------------------------------------------------
+%  公式编号：IEEE 正文用阿拉伯数字连续编号，编号右对齐。
+%  \[ 时递增 equation 计数器，\] 用 \eqno 把编号排到右侧。
+%  （不用 \tag，amsmath 会报 "tag not allowed here"）
+%  不想编号的公式，在生成的 .tex 里改写，或在 Markdown 里用
+%  [not numbered] 之类的无编号语法（见 references/markdown-syntax.md）。
+% -------------------------------------------------------------------
+\makeatletter
+\let\pandoc@orig@lbracket\[
+\let\pandoc@orig@rbracket\]
+\def\[{%
+  \pandoc@orig@lbracket
+  \refstepcounter{equation}%
+}
+\def\]{%
+  \eqno{(\theequation)}%
+  \pandoc@orig@rbracket
+}
+\makeatother
+
+% 收紧行间公式上下间距
+\AtBeginDocument{%
+  \setlength{\abovedisplayskip}{4pt plus 2pt minus 2pt}%
+  \setlength{\belowdisplayskip}{4pt plus 2pt minus 2pt}%
+}
+
+% -------------------------------------------------------------------
+%  图片：给 graphicx 设默认宽度 = \linewidth，原始像素图自动缩到栏宽。
+%  需要更窄时在 Markdown 里写 ![...](img.png){width=60%}。
+% -------------------------------------------------------------------
+\setkeys{Gin}{width=\linewidth,keepaspectratio}
+
+% -------------------------------------------------------------------
+%  图表标题：IEEE 风格
+%    * 表题在表格上方，图题在图下方
+%    * footnotesize，居中
+%    * 表题 labelsep=newline：第一行 "TABLE I"，第二行小体大写表名
+% -------------------------------------------------------------------
+\usepackage{caption}
+\captionsetup{
+  font=footnotesize,
+  labelsep=newline,
+  justification=centering,
+  skip=3pt,
+}
+\captionsetup[table]{
+  position=above,
+  labelfont=sc,
+  textfont=sc,
+}
+\captionsetup[figure]{
+  position=below,
+  labelfont=bf,
+  labelsep=period,
+}
+
+% -------------------------------------------------------------------
+%  浮动体间距：IEEE 双栏下图表密集时，默认留白会让页数膨胀。
+% -------------------------------------------------------------------
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+
+% -------------------------------------------------------------------
+%  浮动体排版参数：IEEEtran 默认的浮动比例上限会让 LaTeX 把大量浮动体
+%  往后页堆，产生大片空白甚至多出一页。这里放宽每页浮动比例与数量上限，
+%  并允许通栏浮动体排在页面底部（stfloats 提供 table*/figure* 的 [b] 位置）。
+%  图表密集的文档靠这一项能显著压缩页数。
+% -------------------------------------------------------------------
+\usepackage{stfloats}
+\setcounter{totalnumber}{12}
+\setcounter{dbltopnumber}{6}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\bottomfraction}{0.90}
+\renewcommand{\floatpagefraction}{0.80}
+\renewcommand{\dblfloatpagefraction}{0.80}
+\renewcommand{\textfraction}{0.03}
+
+% ===================================================================
+%  标题 / 作者 / 摘要 / 正文
+%  IEEEtran 原生提供 \title \author \maketitle，
+%  把 pandoc 的 YAML 元数据交给它即可得到 IEEE 标题版式。
+% ===================================================================
+$if(title)$
+\title{$title$}
+$endif$
+$if(author)$
+\author{$for(author)$$author$$sep$ \and $endfor$}
+$endif$
+$if(date)$
+\date{$date$}
+$else$
+\date{}
+$endif$
+
+\begin{document}
+\maketitle
+% -------------------------------------------------------------------
+%  摘要与关键词：取自 Markdown 的 YAML 元数据，交给 IEEEtran 的
+%  abstract / IEEEkeywords 环境，自动生成 "Abstract—" / "Index Terms—"。
+%  必须紧跟 \maketitle（IEEEtran 通栏标题块的要求）。
+% -------------------------------------------------------------------
+$if(abstract)$
+\begin{abstract}
+$abstract$
+\end{abstract}
+$endif$
+$if(keywords)$
+\begin{IEEEkeywords}
+$keywords$
+\end{IEEEkeywords}
+$endif$
+$body$
+\end{document}
